@@ -2,6 +2,7 @@ use16
 org 0x7c00
 
 MAX_BUFF_LEN equ 256
+buffer equ 0x7c00 + 512
 
 include 'lib.asm'
 
@@ -9,7 +10,6 @@ include 'lib.asm'
 start:
   mov al, 3
   call set_video_mode
-  mov word [bufflen], 0
 
 process_key:
   call read_key
@@ -30,6 +30,19 @@ process_key:
 
 on_enter:
   call put_neline
+  ; pusha
+
+  ; mov ah, VID_QUERY_CUR
+  ; mov bh, 0
+  ; int INT_VID
+
+  ; inc dh
+  ; mov dl, 0
+  ; mov ah, VID_SET_CUR_POS
+  ; int INT_VID
+
+  ; popa
+  
   mov cx, word [bufflen]
   cmp cx, 0
   jz process_key
@@ -39,14 +52,28 @@ on_enter:
   jmp process_key
 
 on_backspace:
+;   mov ah, VID_QUERY_CUR
+;   mov bh, 0
+;   int INT_VID
+
+;   cmp dl, 0
+;   jnz on_backspace_cont
+;   cmp dh, 0
+;   jz process_key
+;   dec dh
+;   mov dl, 79
+;   mov ah, VID_SET_CUR_POS
+;   int INT_VID
+;   call delete_char
+;   jz process_key
+
+; on_backspace_cont:
   mov cx, word [bufflen]
   cmp cx, 0
   jz process_key
-
   call delete_char
   dec cx
   mov word [bufflen], cx
-  
   jmp process_key
 
 
@@ -80,8 +107,7 @@ print_buffer_end:
   ret
   
 
-buffer rb MAX_BUFF_LEN
-bufflen rw 1
+bufflen dw 0
 
 
 times 510 - ($ - $$) db 0
