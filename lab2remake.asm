@@ -52,22 +52,38 @@ on_enter:
   jmp process_key
 
 on_backspace:
-;   mov ah, VID_QUERY_CUR
-;   mov bh, 0
-;   int INT_VID
+  mov ah, VID_QUERY_CUR
+  mov bh, 0
+  int INT_VID
 
-;   cmp dl, 0
-;   jnz on_backspace_cont
-;   cmp dh, 0
-;   jz process_key
-;   dec dh
-;   mov dl, 79
-;   mov ah, VID_SET_CUR_POS
-;   int INT_VID
-;   call delete_char
-;   jz process_key
+  cmp dl, 0
+  jnz on_backspace_cont
+  cmp dh, 0
+  jz process_key
+  dec dh
+  mov dl, 79
+  mov ah, VID_SET_CUR_POS
+  int INT_VID
 
-; on_backspace_cont:
+  mov ah, 0xa
+  mov al, KEY_SPACE
+  mov bh, 0
+  mov cx, 1
+  int INT_VID
+
+  mov cx, word [bufflen]
+  cmp cx, 0
+  jg decrement_bufflen
+  
+  jmp process_key
+
+decrement_bufflen:
+  mov cx, word [bufflen]
+  dec cx
+  mov word [bufflen], cx
+  jmp process_key
+
+on_backspace_cont:
   mov cx, word [bufflen]
   cmp cx, 0
   jz process_key
