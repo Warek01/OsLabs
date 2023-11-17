@@ -30,18 +30,6 @@ process_key:
 
 on_enter:
   call put_neline
-  ; pusha
-
-  ; mov ah, VID_QUERY_CUR
-  ; mov bh, 0
-  ; int INT_VID
-
-  ; inc dh
-  ; mov dl, 0
-  ; mov ah, VID_SET_CUR_POS
-  ; int INT_VID
-
-  ; popa
   
   mov cx, word [bufflen]
   cmp cx, 0
