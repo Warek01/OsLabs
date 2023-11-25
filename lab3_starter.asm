@@ -2,7 +2,7 @@ bits 16
 org 0x7c00
 
 ; This code starts the code starting at the second sector
-; https://stackoverflow.com/questions/39534327/bootloader-not-loading-second-sector
+; 
 
 ; Max CERNETCHI img offset = 538112
 ; Alexandru DOBROJAN img offset = 599552
@@ -12,15 +12,20 @@ org 0x7c00
 start:
   mov ax, 0x07e0     
   mov es, ax  
+
+reset_floppy:
+  xor ax, ax
+  int 0x13
+  jc reset_floppy ; retry if error       
     
-floppy:
+read_floppy:
   mov ah, 0x2 
-  mov al, 0x1 ; sectors nr
+  mov al, 0x1 ; sectors nr (increase if not enough memory)
   mov ch, 0x0 ; track
   mov cl, 0x2 ; sector
   mov dh, 0x0 ; head
   int 0x13
-  jc floppy
+  jc read_floppy ; retry if error
 
   jmp 0x07e0:0x0000 
 
