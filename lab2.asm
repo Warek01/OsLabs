@@ -46,6 +46,10 @@ on_backspace:
 
   cmp dl, 0
   jnz on_backspace_cont
+  mov cx, word [bufflen]
+  cmp cx, 0
+  jz process_key
+  
   cmp dh, 0
   jz process_key
   dec dh

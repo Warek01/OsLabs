@@ -92,15 +92,10 @@ delete_char:
   mov al, KEY_BACKSPACE
   call print_ch
 
+  mov ah, 0xa
   mov al, KEY_SPACE
-  call print_ch
-
-  mov ah, VID_QUERY_CUR
   mov bh, 0
-  int INT_VID
-
-  dec dl
-  mov ah, VID_SET_CUR_POS
+  mov cx, 1
   int INT_VID
 
   popa
