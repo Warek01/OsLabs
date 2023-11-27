@@ -26,7 +26,6 @@
 
 %define MAX_BUFFLEN 0xff
 
-org 0x7e00
 jmp start
 
 ; ax - number to print
@@ -180,4 +179,20 @@ reset_cursor:
   mov dl, 0x0
   int INT_VID
   popa
+  ret
+
+
+; si - string, cl - characters count
+print_count:
+  xor ch, ch
+  
+.iteration:
+  cmp ch, cl
+  jz .end
+  lodsb
+  call printch
+  inc ch
+  jmp .iteration
+
+.end:
   ret
