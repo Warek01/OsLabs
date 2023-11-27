@@ -73,7 +73,7 @@ put_neline:
 
 
 ; al - character to print
-print_ch:
+printch:
   mov ah, VID_PUTCHAR
   int INT_VID
   ret
@@ -90,7 +90,7 @@ delete_char:
   pusha
 
   mov al, KEY_BACKSPACE
-  call print_ch
+  call printch
 
   mov ah, 0xa
   mov al, KEY_SPACE

@@ -11,7 +11,7 @@ org 0x7c00
 
 start:
   mov ax, 0x07e0     
-  mov es, ax  
+  mov es, ax ; caller's buffer address
 
 reset_floppy:
   xor ax, ax

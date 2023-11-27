@@ -24,7 +24,7 @@ process_key:
   cmp cx, MAX_BUFF_LEN
   jz process_key
 
-  call print_ch
+  call printch
   call add_to_buffer
   jmp process_key
 
@@ -105,7 +105,7 @@ print_buffer_iteration:
   mov si, buffer
   add si, cx
   mov al, [si]
-  call print_ch
+  call printch
   inc cx
   jmp print_buffer_iteration
 
