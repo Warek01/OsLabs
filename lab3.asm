@@ -70,10 +70,32 @@ start:
   ; Now we have N, {Head, Track, Sector} and String to write
   call reset_floppy
 
-  ; mov ah, DSK_WRITE
-  ; mov
+  push    ax
+
+  mov     ax, 0x0
+	mov     es, ax
+  mov     bx, buffer
+
+  pop     ax
+
+  mov     ah, 0x3
+  mov     al, [n]
+  mov     ch, [track]
+  mov     cl, [sector]
+  mov     dh, [head]
+  mov     dl, 0x0
+
+  int     INT_DSK
+  mov     al, ah
+  xor     ah, ah
+  call    print_num
+
+
+  mov ah, 0
+  int 0x16
 
   mov si, press_any_key
+
   call println
   call read_key
   call clear_screen
@@ -82,6 +104,49 @@ start:
 .floppy_ram: ; handle floppy to ram
   mov si, floppy_ram_message
   call println
+  call read_n
+  call read_head
+  call read_track
+  call read_sector
+  call read_address
+
+  call put_neline
+
+  ; Now we have N, {Head, Track, Sector} and String to write
+  call reset_floppy
+
+  push    ax
+
+  mov     ax, [segment_word]
+	mov     es, ax
+  mov     bx, buffer
+
+  pop     ax
+
+  mov     ah, 0x2
+  mov     al, [n]
+  mov     ch, [track]
+  mov     cl, [sector]
+  mov     dh, [head]
+  mov     dl, 0x0
+  mov     bx, [address]
+
+  mov ax, [segment_word]
+  call print_num
+  call put_neline
+
+  mov ax, [address]
+  call print_num
+  call put_neline
+
+  int     INT_DSK
+  mov     al, ah
+  xor     ah, ah
+  call    print_num
+
+  mov ah, 0
+  int 0x16
+
   jmp .main_loop
 
 .ram_floppy: ; handle ram to floppy
@@ -292,16 +357,28 @@ select_sector_message db "Sector: ", 0x0
 floppy_ram_message db "(FLOPPY ==> RAM)", 0x0
 ram_floppy_message db "(RAM ==> FLOPPY)", 0x0
 input_string_message db "String: ", 0x0
+empty_string db 0x0
+address_help db "Segment:Address:", 0x0
+address_space db "____:____", 0x0
+
+segment_buffer dd 0
+address_buffer dd 0
+
 
 section .bss
 buffer resb 0xff 
 bufflen resw 0x1
+storage_buffer resb 1
 n resw 0x1
 q resw 0x1
 head resw 0x1
 track resw 0x1
 sector resw 0x1
+segment_word resw 0x1
+address resw 0x1
 
+
+nhts                resb 8
 ; Nr of stuff to read/write
 heads_count resw 0x1
 tracks_count resw 0x1

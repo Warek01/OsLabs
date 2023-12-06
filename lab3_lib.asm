@@ -196,3 +196,118 @@ print_count:
 
 .end:
   ret
+; read_address - prints "Segment:Address? ____:____" prompt, must be completed to return
+; Args - none
+; Rets - segment - value of the segment input
+;		 address - value of the address input
+read_address: 
+  mov si, address_help
+  call println
+	mov si, address_space
+  call print
+  mov ax, 0x0e0d
+  int 0x10
+    mov di, segment_buffer
+read_address_input:
+    
+    mov ah, 0x00
+    int 0x16
+
+    cmp ah, 0x0e
+    je read_address_input_bksp
+
+    cmp ah, 0x1c
+    je read_address_input_enter
+
+    cmp ah, 0x01
+    je read_address_input_esc
+
+    cmp al, 0x20
+    jae read_address_input_default
+
+    jmp read_address_input
+
+read_address_input_bksp:
+    cmp di, segment_buffer
+    je read_address_input
+    mov ah, 0x03
+    int 0x10
+    dec dl
+    cmp di, address_buffer
+    jne read_address_input_bksp1
+    dec dl
+read_address_input_bksp1:
+    mov ah, 0x02
+    int 0x10
+    mov ah, 0x0a
+    mov al, '_'
+    mov bh, 0
+    mov cx, 1
+    int 0x10
+    mov [di], byte 0
+    dec di
+    jmp read_address_input
+
+read_address_input_enter:
+    cmp di, address_buffer+4
+    jne read_address_input
+
+read_address_process_input:
+    mov di, segment_buffer
+    mov si, segment_word
+read_address_process_cond:
+    cmp di, segment_buffer+8
+    je read_address_process_input_for_end
+    mov al, [di+2]
+    shl al, 4
+    or al, [di+3]
+    mov ah, [di]
+    shl ah, 4
+    or ah, [di+1]
+    mov word [si], ax
+    call print_num
+    call put_neline
+
+    add di, 4
+    add si, 2
+    mov ah, 0
+    int 0x16
+    jmp read_address_process_cond
+read_address_process_input_for_end:
+	ret
+
+read_address_input_esc:
+    ret
+
+read_address_input_default:
+    cmp di, address_buffer+4
+    je read_address_input
+read_address_input_default_check_digit:
+    cmp al, '0'-1
+    jbe read_address_input_default_check_letter
+    cmp al, '9'
+    mov bl, '0'
+    jbe read_address_input_default_check_positive
+read_address_input_default_check_letter:
+    cmp al, 'a'-1
+    jbe read_address_input_default_check_negative
+    cmp al, 'f'
+    ja read_address_input_default_check_negative
+    mov bl, 'a'-10
+read_address_input_default_check_positive:
+    mov ah, 0x0e
+    int 0x10
+    sub al, bl
+    stosb
+    cmp di, address_buffer
+    jne read_address_input
+read_address_input_default_move_cursor:
+    mov ah, 0x03
+    mov bh, 0
+    int 0x10
+    inc dl
+    mov ah, 0x02
+    int 0x10
+read_address_input_default_check_negative:
+    jmp read_address_input
+
