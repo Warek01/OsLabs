@@ -1,313 +1,641 @@
-%define KEY_BACKSPACE 0x8
-%define KEY_LF        0xa
-%define KEY_CR        0xd
-%define KEY_SPACE     0x20
 
-%define INT_VID 0x10
-%define INT_DSK 0x13
-%define INT_KB  0x16
+%define KEY_BACKSPACE       08h
+%define KEY_SPACE           20h
+%define KEY_ENTER           0dh
 
-%define VID_SET_MODE      0x0
-%define VID_SET_CUR_SHAPE 0x1
-%define VID_SET_CUR_POS   0x2
-%define VID_PUTCHAR       0xe
-%define VID_QUERY_CUR     0x3
-%define VID_SCROLL_UP     0x6
-%define VID_SCROLL_DOWN   0x7
-%define KB_READ           0x0
-%define DSK_RESET         0x0
-%define DSK_GETERR        0x1
-%define DSK_READ          0x2
-%define DSK_WRITE         0x3
+%define INT_VID             10h
+%define INT_DSK             13h
+%define INT_KB              16h
 
-%define OP_KEYBOARD_FLOPPY '1'
-%define OP_FLOPPY_RAM      '2'
-%define OP_RAM_FLOPPY      '3'
+%define VID_SET_CUR_SHAPE   01h
+%define VID_SET_CUR_POS     02h
+%define VID_QUERY_CUR       03h
 
-%define MAX_BUFFLEN 0xff
+%define VID_WRITE_CHAR      0ah
+%define VID_TTY             0eh
+%define VID_WRITE_STR       1301h
 
-jmp start
+%define KB_READ             00h
 
-; ax - number to print
-print_num:
-  pusha
-  mov cx, 10 
-  push 0
+%define DSK_RESET           00h
+%define DSK_READ            02h
+%define DSK_WRITE           03h
 
-print_num_convert_loop:
-  xor dx, dx
-  div cx
-  add dl, '0'
-  push dx
-  cmp ax, 0
-  jnz print_num_convert_loop
+%define OP_KEYBOARD_FLOPPY  31h
+%define OP_FLOPPY_RAM       32h
+%define OP_RAM_FLOPPY       33h
 
-print_num_print_loop:
-  pop ax
-  cmp al, 0 
-  jz print_num_end
-  mov ah, VID_PUTCHAR 
-  int INT_VID
-  jmp print_num_print_loop
+jmp     start
 
-print_num_end:
-  popa
-  ret
+; ========================================
 
+get_cursor_pos:
+    mov     ah, VID_QUERY_CUR
+    mov     bh, 0
+    int     INT_VID
 
-; si - string to print
-print:
-  pusha
-
-.loop:
-  lodsb ; mov byte al, [si] && inc si
-  cmp al, 0
-  jz .end
-  mov ah, VID_PUTCHAR
-  int INT_VID
-  jmp .loop
-
-.end:
-  popa
-  ret
-
-
-; si - string to print
-println:
-  call print
-  call put_neline
-  ret
-
-
-put_neline:
-  pusha
-  mov ah, VID_PUTCHAR
-  mov al, KEY_LF
-  int INT_VID
-  mov al, KEY_CR
-  int INT_VID
-  popa
-  ret
-
-
-; al - character to print
-printch:
-  mov ah, VID_PUTCHAR
-  int INT_VID
-  ret
-  
-
-; output al - character code
-read_key:
-  mov ah, KB_READ
-  int INT_KB
-  ret
-
-
-delete_char:
-  pusha
-
-  mov al, KEY_BACKSPACE
-  call printch
-
-  mov ah, 0xa
-  mov al, KEY_SPACE
-  mov bh, 0
-  mov cx, 1
-  int INT_VID
-
-  popa
-  ret
-
-
-; al - video mode
-set_video_mode:
-  pusha
-  mov ah, VID_SET_MODE
-  int INT_VID
-  popa
-  ret
-
-
-; si - string to read, returns ax - the number
-atoi:
-  push cx
-  push bx
-  mov ax, 0x0
-  mov bx, 0xa
-
-.loop:
-  xor cx, cx
-  mov cl, byte [si]
-  inc si
-  cmp cx, 0x0
-  jz .end
-  sub cx, '0'
-  mul bx
-  add ax, cx
-  jmp .loop
-
-.end:
-  pop bx
-  pop cx
-  ret
-
-
-clear_screen:
-  pusha
-  call reset_cursor
-  mov cx, 0
-  mov al, KEY_SPACE
-
-.loop:
-  cmp cx, 80 * 25
-  jz .end
-  inc cx
-  call printch
-  jmp .loop
-.end:
-  call reset_cursor
-  popa
-  ret
-
-
-reset_cursor:
-  pusha
-  mov ah, VID_SET_CUR_POS
-  mov bh, 0x0
-  mov dh, 0x0
-  mov dl, 0x0
-  int INT_VID
-  popa
-  ret
-
-
-; si - string, cl - characters count
-print_count:
-  xor ch, ch
-  
-.iteration:
-  cmp ch, cl
-  jz .end
-  lodsb
-  call printch
-  inc ch
-  jmp .iteration
-
-.end:
-  ret
-; read_address - prints "Segment:Address? ____:____" prompt, must be completed to return
-; Args - none
-; Rets - segment - value of the segment input
-;		 address - value of the address input
-read_address: 
-  mov si, address_help
-  call println
-	mov si, address_space
-  call print
-  mov ax, 0x0e0d
-  int 0x10
-    mov di, segment_buffer
-read_address_input:
-    
-    mov ah, 0x00
-    int 0x16
-
-    cmp ah, 0x0e
-    je read_address_input_bksp
-
-    cmp ah, 0x1c
-    je read_address_input_enter
-
-    cmp ah, 0x01
-    je read_address_input_esc
-
-    cmp al, 0x20
-    jae read_address_input_default
-
-    jmp read_address_input
-
-read_address_input_bksp:
-    cmp di, segment_buffer
-    je read_address_input
-    mov ah, 0x03
-    int 0x10
-    dec dl
-    cmp di, address_buffer
-    jne read_address_input_bksp1
-    dec dl
-read_address_input_bksp1:
-    mov ah, 0x02
-    int 0x10
-    mov ah, 0x0a
-    mov al, '_'
-    mov bh, 0
-    mov cx, 1
-    int 0x10
-    mov [di], byte 0
-    dec di
-    jmp read_address_input
-
-read_address_input_enter:
-    cmp di, address_buffer+4
-    jne read_address_input
-
-read_address_process_input:
-    mov di, segment_buffer
-    mov si, segment_word
-read_address_process_cond:
-    cmp di, segment_buffer+8
-    je read_address_process_input_for_end
-    mov al, [di+2]
-    shl al, 4
-    or al, [di+3]
-    mov ah, [di]
-    shl ah, 4
-    or ah, [di+1]
-    mov word [si], ax
-    call print_num
-    call put_neline
-
-    add di, 4
-    add si, 2
-    mov ah, 0
-    int 0x16
-    jmp read_address_process_cond
-read_address_process_input_for_end:
-	ret
-
-read_address_input_esc:
     ret
 
-read_address_input_default:
-    cmp di, address_buffer+4
-    je read_address_input
-read_address_input_default_check_digit:
-    cmp al, '0'-1
-    jbe read_address_input_default_check_letter
-    cmp al, '9'
-    mov bl, '0'
-    jbe read_address_input_default_check_positive
-read_address_input_default_check_letter:
-    cmp al, 'a'-1
-    jbe read_address_input_default_check_negative
-    cmp al, 'f'
-    ja read_address_input_default_check_negative
-    mov bl, 'a'-10
-read_address_input_default_check_positive:
-    mov ah, 0x0e
-    int 0x10
-    sub al, bl
-    stosb
-    cmp di, address_buffer
-    jne read_address_input
-read_address_input_default_move_cursor:
-    mov ah, 0x03
-    mov bh, 0
-    int 0x10
-    inc dl
-    mov ah, 0x02
-    int 0x10
-read_address_input_default_check_negative:
-    jmp read_address_input
+; ========================================
 
+read_input:
+    mov     si, input_buffer
+
+    typing:
+        ; read the key pressed
+
+        mov     ah, KB_READ
+        int     INT_KB
+
+        ; handle special keys
+
+        cmp     al, KEY_BACKSPACE
+	    je      hdl_backspace
+
+	    cmp     al, KEY_ENTER
+	    je      hdl_enter
+
+        ; prevent program form reading more than 256 characters
+
+        cmp     si, input_buffer + 256
+        je      typing
+
+        ; save the character read to the buffer
+
+        mov     [si], al
+	    inc     si
+
+        ; display the character read
+
+        mov     ah, VID_TTY
+	    int     INT_VID
+
+	    jmp     typing
+
+    hdl_backspace:
+
+        ; if the buffer is empty, ignore backspace
+
+	    cmp     si, input_buffer
+	    je      typing
+
+        ; else erase the previous character from the buffer
+
+	    dec     si
+    	mov     byte [si], 0
+
+        ; and print a blank space over it on the screen
+
+        call    get_cursor_pos
+
+        ; if at the start of the second+ line return to the previous one and proceed in the same manner
+
+	    cmp     dl, 0
+        je      prev_line
+
+        ; else just return the cursor one colum back and print a blank space over what was there
+
+        call    get_cursor_pos
+
+        mov     ah, VID_SET_CUR_POS
+        dec     dl
+        int     INT_VID
+
+        mov     ah, VID_WRITE_CHAR
+        mov     al, 20h
+        int     INT_VID
+
+	    jmp     typing
+
+    prev_line:
+        call    get_cursor_pos
+
+        mov     ah, VID_SET_CUR_POS
+        dec     dh
+        mov     dl, 79
+        int     INT_VID
+
+        mov     ah, VID_WRITE_CHAR
+        mov     al, 20h
+        int     INT_VID
+    
+        jmp     typing
+
+    hdl_enter:
+
+        ; if the buffer is empty - user is not allowed to proceed
+
+        cmp     si, input_buffer
+        je      typing
+
+        ; ensure that the buffer ends with an empty byte
+
+        mov     byte [si], 0
+
+        ret
+
+; ----------------------------------------
+
+; ax = 0/1 - dec/hex
+check_num_input:
+    mov     si, input_buffer
+    mov     byte [operation_flag], 1
+
+    check_char_loop:
+        cmp     byte [si], 00h
+        je      check_input_approved
+
+        check_char_block:
+
+            check_digits:
+                cmp     byte [si], 30h
+                jl      check_input_denied
+
+                cmp     byte [si], 39h
+                jle     char_approved
+
+                cmp     ax, 1
+                je      check_letters
+
+                jmp     check_input_denied
+
+            check_letters:
+                cmp     byte [si], 41h
+                jl      check_input_denied
+
+                cmp     byte [si], 46h
+                jg      check_input_denied
+
+            char_approved:
+                inc     si
+                jmp     check_char_loop
+
+    check_input_denied:
+        mov     byte [operation_flag], 0
+
+    check_input_approved:
+        ret
+
+; ----------------------------------------
+
+paginated_output:
+
+    ; setup the RAM pointer
+
+    mov     es, [address]
+    mov     bp, [address + 2]
+
+    paginated_output_loop:
+        dec     word [n]
+        jz      stop_paginated_output
+
+        ; prepare a clean page
+
+        push    es
+        push    bp
+        call    clear_screen
+        pop     bp
+        pop     es
+
+        ; print one sector
+
+        push    cx
+
+        mov     bl, 07h
+        mov     cx, 512
+
+        mov     ax, 1301h
+        int     10h
+
+        ; advance pointers and counters
+
+        pop     cx
+        inc     cx
+        add     bp, 512
+
+        wait_for_page_advance_signal:
+
+            ; read a keypress
+
+            mov     ah, 00h
+            int     16h
+
+            ; if ENTER - break
+
+            cmp     al, KEY_ENTER
+            je      stop_paginated_output
+
+            ; if SPACE - proceed to the next page
+
+            cmp     al, KEY_SPACE
+            jne     wait_for_page_advance_signal
+
+        jmp     paginated_output_loop
+
+    stop_paginated_output:
+        ret
+
+; ========================================
+
+break_line:
+    call    get_cursor_pos
+    inc     dh
+    mov     dl, 0
+
+    xor     ax, ax
+    mov     es, ax
+    mov     bp, empty_str
+
+    mov     bl, 07h
+    mov     cx, 0
+
+    mov     ax, VID_WRITE_STR
+    int     INT_VID
+
+    ret
+
+; si - the effective address of a char buffer to print
+; cx - the length of the buffer
+print_str:
+    push    cx
+    push    si
+
+    call    get_cursor_pos
+
+    xor     ax, ax
+    mov     es, ax
+    pop     si
+    mov     bp, si
+
+    mov     bl, 07h
+    pop     cx
+
+    mov     ax, VID_WRITE_STR
+    int     INT_VID
+
+    ret
+
+clear_screen:
+    mov     ah, VID_SET_CUR_POS
+    mov     bh, 0
+    mov     dh, 0
+    mov     dl, 0
+    int     INT_VID
+
+    mov     cx, 22
+
+    clear_screen_loop:
+        push    cx
+
+        mov     ah, VID_WRITE_CHAR
+        mov     al, KEY_SPACE
+        mov     bh, 0
+        mov     bl, 07h
+        mov     cx, 80
+        int     INT_VID
+
+        call    break_line
+
+        pop     cx
+        dec     cx
+        jnz     clear_screen_loop
+
+    mov     ah, VID_SET_CUR_POS
+    mov     bh, 0
+    mov     dh, 0
+    mov     dl, 0
+    int     INT_VID
+
+    ret
+
+; ========================================
+
+; si - src. buffer
+; di - buffer to store the actuall numerical value
+atoi:
+    atoi_conv_loop:
+
+        ; check if all the digits were converted
+
+        cmp     byte [si], 0
+        je      atoi_conv_done
+
+        ; convert the character's bytes to the number equivalent
+
+        xor     ax, ax
+        mov     al, [si]
+        sub     al, '0'
+
+        ; shift all the digits one place left and put a new digit at the first place
+
+        mov     bx, [di]
+        imul    bx, 10
+        add     bx, ax
+        mov     [di], bx
+
+        ; advance to pint at the next charactr representing some digit
+
+        inc     si
+        jmp     atoi_conv_loop
+
+    atoi_conv_done:
+        ret
+
+; ----------------------------------------
+
+; si - src. buffer
+; di - buffer to store the actuall numerical value
+atoh:
+    atoh_conv_loop:
+
+        ; essentially works the same as the subroutine above, but ... 
+        ; also need to consider that there are some letters representing - [Ah..Fh], that ... 
+        ; need to be converted into numerical values - [10d..15d]
+
+        cmp     byte [si], 0
+        je      atoh_conv_done
+
+        xor     ax, ax
+        mov     al, [si]
+        cmp     al, 65
+        jl      conv_digit  
+
+        conv_letter:
+            sub     al, 55
+            jmp     atoh_finish_iteration
+
+        conv_digit:
+            sub     al, 48
+
+        atoh_finish_iteration:
+            mov     bx, [di]
+            imul    bx, 16
+            add     bx, ax
+            mov     [di], bx
+
+            inc     si
+
+        jmp     atoh_conv_loop
+
+    atoh_conv_done:
+        ret
+
+; ----------------------------------------
+
+; di - pointer to the value to check
+conv_check:
+    mov     ah, 0eh
+    mov     al, 20h
+    int     10h
+
+    mov     ah, 0eh
+    mov     al, 3eh
+    int     10h
+
+    mov     ah, 0eh
+    mov     al, 3eh
+    int     10h
+
+    mov     ah, 0eh
+    mov     al, 20h
+    int     10h
+
+    mov     ax, [di]
+    mov     bx, [test_result]
+
+    xor     ax, bx
+    jnz     incorrect
+
+    correct:
+        mov     ah, 0eh
+        mov     al, 53h
+        int     10h
+
+        jmp     check_end
+
+    incorrect:
+        mov     ah, 0eh
+        mov     al, 45h
+        int     10h
+
+    check_end:
+        ret
+
+
+; ========================================
+
+read_hts_addr:
+
+    ; print head
+
+    call    break_line
+    mov     si, hts_in_head_str
+    mov     cx, hts_in_head_str_len
+    call    print_str
+
+    ; setup counter: cx=0 - read head, cx=1 - read track, ...
+    ; hts_in_str + cx * hts_in_str_len: cx=0 - "Head   = ", cx=1 - "Track  = ", ...
+    ; [hts + cx * 2]: cx=0 - head value, cx=1 - track value, ...
+
+    mov     word [mp_16bit_counter], 0
+
+    read_hts_addr_loop:
+        call    break_line
+
+        mov     si, hts_in_str
+        mov     cx, [mp_16bit_counter]
+        imul    cx, hts_in_str_len
+        add     si, cx
+        mov     cx, hts_in_str_len
+        call    print_str
+
+        call    read_input
+
+        mov     ax, 0
+        call    check_num_input
+
+        cmp     byte [operation_flag], 0
+        je      read_hts_addr_end
+
+        mov     di, hts
+        mov     cx, [mp_16bit_counter]
+        imul    cx, 2
+        add     di, cx
+        mov     si, input_buffer
+        call    atoi
+        
+        inc     word [mp_16bit_counter]
+
+        cmp     word [mp_16bit_counter], 2
+        jle     read_hts_addr_loop
+
+    read_hts_addr_end:
+        ret
+
+; ----------------------------------------
+
+read_ram_addr:
+
+    ; print head
+
+    call    break_line
+    mov     si, addr_in_head_str
+    mov     cx, addr_in_head_str_len
+    call    print_str
+
+    ; the same princeple as in the read_hts_addr
+
+    mov     word [mp_16bit_counter], 0
+
+    read_ram_addr_loop:
+        call break_line
+
+        mov     si, addr_in_str
+        mov     cx, [mp_16bit_counter]
+        imul    cx, addr_in_str_len
+        add     si, cx
+        mov     cx, addr_in_str_len
+        call    print_str
+
+        call    read_input
+
+        mov     ax, 1
+        call    check_num_input
+
+        cmp     byte [operation_flag], 0
+        je      read_ram_addr_end
+
+        mov     di, address
+        mov     cx, [mp_16bit_counter]
+        imul    cx, 2
+        add     di, cx
+        mov     si, input_buffer
+        call    atoh
+
+        inc     word [mp_16bit_counter]
+
+        cmp     word [mp_16bit_counter], 1
+        jle     read_ram_addr_loop
+
+    read_ram_addr_end:
+        ret
+
+; ========================================
+
+; si - src. buffer
+; di - target buffer
+; cx - n times to copy
+; bx - block size
+copy_buffer:
+    mov     word [copy_size], 0
+
+    push    si
+    mov     dx, 0
+
+    find_end:
+        cmp     byte [si], 00h
+        je      end_found
+
+        inc     si
+        inc     dx
+
+        jmp     find_end
+
+    end_found:
+        pop     si
+
+        inc     cx
+        push    cx
+        push    dx
+        push    cx
+
+    copy_buffer_loop:
+        pop     cx
+        dec     cx
+        jz      zeroing
+
+        push    cx
+        push    si
+        push    dx
+
+        copy_characters_loop:
+            mov     al, [si]
+            mov     [di], al
+
+            inc     si
+            inc     di
+
+            dec     dx
+            jnz     copy_characters_loop
+
+        pop     dx
+        pop     si
+
+        add     word [copy_size], dx
+
+        jmp     copy_buffer_loop
+
+    zeroing:
+        pop     dx
+        pop     cx
+        dec     cx
+
+        imul    dx, cx
+
+        mov     ax, dx
+        xor     dx, dx
+        div     bx
+
+        zeroing_loop1:
+            cmp     dx, bx
+            je      copy_buffer_finished
+
+            mov     byte [di], 00h
+            inc     di
+            inc     dx
+            inc     word [copy_size]
+
+            jmp     zeroing_loop1
+
+    copy_buffer_finished:
+        ret
+
+; ----------------------------------------
+
+transfer_n_bytes_from_ram:
+    xor     dx, dx
+    mov     ax, [n]
+    mov     bx, 512
+    div     bx
+
+    mov     cx, 0
+    
+    mov     es, [address]
+    mov     bp, [address + 2]
+
+    mov     si, storage_buffer
+
+    copy_bytes_loop:
+        cmp     cx, [n]
+        jge     zeroing_loop2
+
+        xor     ax, ax
+        mov     al, [es:bp]
+        mov     [si], al
+        
+        inc     bp
+        inc     si
+        inc     cx
+
+        jmp     copy_bytes_loop
+
+    zeroing_loop2:
+        mov     byte [si], 0
+            
+        inc     si
+        inc     dx
+
+        cmp     dx, 512
+        jl      zeroing_loop2
+    
+    ret
