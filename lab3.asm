@@ -10,23 +10,19 @@ start:
     xor     sp, sp
 
     ; print the options listing str.
-
     mov     si, op_list_str
     mov     cx, op_list_str_len
     call    print_str
 
     ; read user's choice
-
     mov     ah, KB_READ
     int     INT_KB
 
     ; print user's choice
-
     mov     ah, VID_TTY
     int     INT_VID
 
     ; direct the exec. flow
-
     cmp     al, OP_KEYBOARD_FLOPPY
     je      kbd_to_flp
 
@@ -39,9 +35,7 @@ start:
     jmp     error
 
 kbd_to_flp:
-
     ; read the string
-
     call    break_line
     mov     si, str_in_str
     mov     cx, str_in_str_len
@@ -50,7 +44,6 @@ kbd_to_flp:
     call    read_input
 
     ; save the str. to its own buffer
-
     mov     si, input_buffer
     mov     di, str_buffer
     mov     cx, 1
@@ -58,7 +51,6 @@ kbd_to_flp:
     call    copy_buffer
 
     ; read N
-
     call    break_line
     mov     si, n_in_str
     mov     cx, n_in_str_len
@@ -77,14 +69,12 @@ kbd_to_flp:
     call    atoi
 
     ; read HTS address
-
     call    read_hts_addr
 
     cmp     byte [operation_flag], 0
     je      error
 
     ; preapare the buffer to write to the floppy
-
     mov     si, str_buffer
     mov     di, storage_buffer
     mov     cx, [n]
@@ -92,14 +82,12 @@ kbd_to_flp:
     call    copy_buffer
 
     ; calculate the number of sectos to write
-
     xor     dx, dx
     mov     ax, [copy_size]
     mov     bx, 512
     div     bx
 
     ; write to the floppy
-
     push    ax
 
     xor     ax, ax
@@ -118,11 +106,9 @@ kbd_to_flp:
     int     INT_DSK
 
     ; print the error code
-
     call    display_error_code
 
     ; print the string read
-
     call    break_line
     call    break_line
     mov     si, str_buffer
@@ -132,23 +118,19 @@ kbd_to_flp:
     jmp     terminate
 
 flp_to_ram:
-
     ; read HTS address
-
     call    read_hts_addr
 
     cmp     byte [operation_flag], 0
     je      error
 
     ; read RAM address
-
     call    read_ram_addr
 
     cmp     byte [operation_flag], 0
     je      error
 
     ; read N
-
     call    break_line
     mov     si, n_in_str
     mov     cx, n_in_str_len
@@ -167,7 +149,6 @@ flp_to_ram:
     call    atoi
 
     ; read data from floppy
-
     mov     es, [address + 0]
     mov     bx, [address + 2]
 
@@ -181,33 +162,27 @@ flp_to_ram:
     int     INT_DSK
 
     ; print error code
-    
     call    display_error_code
 
     ; print the data read
-
     call    paginated_output
 
     jmp     terminate
 
 ram_to_flp:
-
     ; read RAM address
-
     call    read_ram_addr
 
     cmp     byte [operation_flag], 0
     je      error
 
     ; read HTS address
-
     call    read_hts_addr
 
     cmp     byte [operation_flag], 0
     je      error
 
     ; read Q
-
     call    break_line
     mov     si, n_in_str
     mov     cx, n_in_str_len
@@ -226,18 +201,15 @@ ram_to_flp:
     call    atoi
 
     ; transfer n bytes to the write buffer
-
     call    transfer_n_bytes_from_ram
 
     ; calculate the number of sectors to write
-
     xor     dx, dx
     mov     ax, [n]
     mov     bx, 512
     div     bx
 
     ; write data to floppy
-
     push    ax
 
     xor     ax, ax
@@ -255,11 +227,9 @@ ram_to_flp:
     int     INT_DSK
 
     ; print the error code
-
     call    display_error_code
 
     ; print the data written
-
     call    break_line
     call    get_cursor_pos
 
@@ -283,14 +253,12 @@ display_error_code:
     push    ax
 
     ; print "EC="
-
     call    break_line
     mov     si, err_code_msg
     mov     cx, err_code_msg_len
     call    print_str
 
     ; print the error code (an integer)
-
     pop     ax
 
     mov     al, '0'
