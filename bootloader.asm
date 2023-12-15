@@ -3,16 +3,10 @@ org 0x7c00
 
 ; Dobrojan Alexandru: 1171 (1 side 32 track, 2 sector)
 
-%define BUFFER_LENGTH 4
+%define BUFFER_LENGTH 6 ; note that last byte of buffer should be always 0 to avoid bugs with string reads that end on 0
 
 start:
   call clear_buffer
-  xor ax, ax
-  xor bx, bx
-  xor cx, cx
-  xor dx, dx
-  xor si, si
-  xor di, di
   
   mov ah, 0x0
   mov al, 0x3
@@ -51,17 +45,38 @@ start:
   call atoi
   call clear_buffer
 
+  ; read segment and convert it
+  mov si, str_segment
+  mov di, buffer
+  mov ch, 4
+  call read_str
+
+  mov si, buffer
+  mov di, w_segment
+  call atoh
+  call clear_buffer
+
+  ; read offset and convert it
+  mov si, str_offset
+  mov di, buffer
+  mov ch, 4
+  call read_str
+
+  mov si, buffer
+  mov di, w_offset
+  call atoh
+  call clear_buffer
+
   ; reset drive
   mov ah, 0
   int 0x13
 
-  ; set ES:BX caller's buffer address 0000:7e00
-  mov ax, 0
-  mov es, ax
-  mov bx, 0x7e00
+  ; set ES:BX caller's buffer address
+  mov es, [w_segment]
+  mov bx, [w_offset]
 
   mov ah, 2 ; read disk
-  mov al, 4 ; sectors count
+  mov al, 5 ; sectors count
   mov ch, [hts + 2] ; track
   mov cl, [hts + 4] ; sector
   mov dh, [hts] ; head
@@ -77,39 +92,31 @@ start:
   int 0x16
   pop ax
 
-  cmp ah, 0
-  jc start
-  jnz start
-  jmp 0x0000:0x7e00 ; offset of next part
+  mov ax, [w_segment]
+  mov bx, [w_offset]
+  mov bp, bx ; preserve offset for code after jump
+  jmp far bx ; offset of next part
 
 
-; si - src. buffer
-; di - buffer to store the actuall numerical value
+; si - string to read
+; di - where to put the number
 atoi:
   pusha
-  mov word [di], 0
+  mov ax, 0x0
+  mov bx, 0xa
 
 .loop:
-  ; check if all the digits were converted
-  cmp byte [si], 0
-  je .done
-
-  ; convert the character's bytes to the number equivalent
-  xor ax, ax
-  mov al, [si]
-  sub al, '0'
-
-  ; shift all the digits one place left and put a new digit at the first place
-  mov bx, [di]
-  imul bx, 10
-  add bx, ax
-  mov [di], bx
-
-  ; advance to pint at the next charactr representing some digit
+  mov cx, [si]
   inc si
+  cmp cx, 0
+  jz .end
+  sub cx, '0'
+  mul bx
+  add ax, cx
   jmp .loop
 
-.done:
+.end:
+  mov [di], ax
   popa
   ret
 
@@ -117,9 +124,6 @@ atoi:
 ; si - src. buffer
 ; di - buffer to store the actuall numerical value
 atoh:
-  ; essentially works the same as the subroutine above, but ... 
-  ; also need to consider that there are some letters representing - [Ah..Fh], that ... 
-  ; need to be converted into numerical values - [10d..15d]
   pusha
 .loop:
   cmp byte [si], 0
@@ -226,13 +230,13 @@ read_str:
 
 
 newline:
-  push ax
+  pusha
   mov ah, 0xe
   mov al, 0xd
   int 0x10
   mov al, 0xa
   int 0x10
-  pop ax
+  popa
   ret
 
 
@@ -263,20 +267,10 @@ print_int:
   ret
 
 clear_buffer:
-  pusha
-  mov cx, 0
-
-.loop:
-  cmp cx, BUFFER_LENGTH
-  jz .end
-  mov si, buffer
-  add si, cx
-  mov byte [si], 0
-  inc cx
-  jmp .loop
-
-.end:
-  popa
+  mov byte [buffer], 0
+  mov byte [buffer + 1], 0
+  mov byte [buffer + 2], 0
+  mov byte [buffer + 3], 0
   ret
 
 
@@ -285,29 +279,23 @@ print_err:
   pusha
   mov si, str_err
   call print_str
-  mov al, ah
-  xor ah, ah
+  shr ax, 4 ; make al=ah and ah=0
   call print_int
   call newline
   popa
   ret
 
-; al - char to print
-print_char:
-  pusha
-  mov ah, 0xe
-  int 0x10
-  popa
-  ret
 
-
-str_name db "Dobrojan Alexandru", 0xd, 0xa, "Head = ", 0
-str_track db "Track = ", 0
-str_sector db "Sector = ", 0
-str_err db "Err = ", 0
+str_name db "Dobrojan Alexandru", 0xd, 0xa, "Head ", 0
+str_track db "Track ", 0
+str_sector db "Sector ", 0
+str_err db "Err ", 0
 buffer times BUFFER_LENGTH db 0
 hts times 3 dw 0
-str_pak db "Press any key to continue ...", 0
+w_segment dw 0
+w_offset dw 0
+str_pak db "Press key", 0
+str_segment db "Segment ", 0
+str_offset db "Offset ", 0
 
-
-align 512
+times $ - ($ - 512) db '='

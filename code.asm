@@ -1,15 +1,38 @@
 bits 16
-org 0x7e00
+org 0x0000 ; bp is the offset
 
 start:
   mov ah, 0x0
   mov al, 3
   int 0x10
 
-  mov cx, 5
-  mov si, test_func
+  lea si, [str_greeting + bp]
+  call print_str
+
+  mov ah, 0
+  int 0x16
+
+  cmp al, 'b'
+  jz .end
+
+  cmp al, 'c'
+  jnz start
+
+  call newline
+
+  mov cx, 3
+  lea si, [test_func + bp]
   call exec_after
   call pak
+
+  xor ax, ax
+  xor bx, bx
+  xor cx, cx
+  xor dx, dx
+  xor si, si
+  xor di, di
+
+.end:
   jmp 0x0000:0x7c00
 
 
@@ -123,7 +146,7 @@ exec_after:
 
 test_func:
   pusha
-  mov si, str_string
+  lea si, [str_string + bp]
   call print_str
   popa
   ret
@@ -132,7 +155,7 @@ test_func:
 pak:
   pusha
   call newline
-  mov si, str_pak
+  lea si, [str_pak + bp]
   call print_str
   mov ah, 0
   int 0x16
@@ -141,6 +164,7 @@ pak:
   ret
 
 
-str_string db "Test string", 0xd, 0xa, 0
+str_greeting db "Continue (c) or go back (b)?", 0
+str_string db "This is shown with delay", 0xd, 0xa, 0
 str_pak db "Press any key to continue ...", 0
 
