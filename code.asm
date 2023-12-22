@@ -20,7 +20,7 @@ start:
 
   call newline
 
-  mov cx, 3
+  mov cx, 5
   lea si, [test_func + bp]
   call exec_after
   call pak
@@ -97,6 +97,12 @@ print_int:
 ; si - function to call
 exec_after:
   pusha
+
+  xor ax, ax
+  mov al, cl
+  call print_int
+  call newline
+  
   push cx
   mov ah, 0
 
@@ -121,6 +127,7 @@ exec_after:
   pop cx
   xor ch, ch
   mov al, cl
+  dec al
   call print_int
   dec cx
   call newline
